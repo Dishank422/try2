@@ -435,7 +435,7 @@ class GHN(nn.Module):
             # with gradients (for multigpu and other cases)
             module._parameters[key] = tensor
         else:
-            assert isinstance(target_param, nn.Parameter), type(target_param)
+            # assert isinstance(target_param, nn.Parameter), type(target_param)
             # copy to make sure there is no sharing of memory
             target_param.data = tensor.clone()
 
