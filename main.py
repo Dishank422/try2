@@ -15,6 +15,8 @@ from models import get_model
 from utils.training import train
 from utils.best_args import best_args
 from utils.conf import set_random_seed
+from backbone.MNISTMLP import MNISTMLP
+from backbone.ResNet18 import resnet18
 
 
 def main():
@@ -71,7 +73,17 @@ def main():
         setattr(args, 'batch_size', 1)
 
     dataset = get_dataset(args)
-    backbone = dataset.get_backbone()
+
+    assert args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist', 'seq-cifar10', 'seq-tinyimg'], "this dataset is not considered"
+    if args.model != 'monologue':
+        backbone = dataset.get_backbone()
+    elif args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist']:
+        backbone = MNISTMLP(28*28, 10)
+    elif args.dataset == 'seq-cifar10':
+        backbone = resnet18(10)
+    else:
+        backbone = resnet18(100)
+
     loss = dataset.get_loss()
     model = get_model(args, backbone, loss, dataset.get_transform())
 
