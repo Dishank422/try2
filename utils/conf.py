@@ -12,7 +12,7 @@ def get_device() -> torch.device:
     """
     Returns the GPU device if available else CPU.
     """
-    return torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    return torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 
 def base_path() -> str:
@@ -31,3 +31,12 @@ def set_random_seed(seed: int) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def capacity(model):
+    c, n = 0, 0
+    for name, p in model.named_parameters():
+        if p.requires_grad:
+            c += 1
+            n += np.prod(p.shape)
+    return c, int(n)

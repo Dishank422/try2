@@ -17,12 +17,29 @@ from .mlp import MLP
 from .gatedgnn import GatedGNN
 from .decoder import MLPDecoder, ConvDecoder
 from .layers import ShapeEncoder
-from ..deepnets1m.ops import NormLayers, PosEnc
-from ..deepnets1m.genotypes import PRIMITIVES_DEEPNETS1M
-from ..deepnets1m.net import named_layered_modules
 from ..deepnets1m.graph import Graph, GraphBatch
 from ...utils.conf import capacity, get_device
 import time
+
+PRIMITIVES_DEEPNETS1M = [
+    'max_pool',
+    'avg_pool',
+    'sep_conv',
+    'dil_conv',
+    'conv',
+    'msa',
+    'cse',
+    'sum',
+    'concat',
+    'input',
+    'bias',
+    'bn',
+    'ln',
+    'pos_enc',
+    'glob_avg',
+]
+
+NormLayers = [nn.BatchNorm2d, nn.LayerNorm]
 
 
 def GHN1(dataset='imagenet'):
@@ -71,6 +88,44 @@ def ghn_parallel(ghn):
     return ghn
 
 
+def get_cell_ind(param_name, layers=1):
+    if param_name.find('cells.') >= 0:
+        pos1 = len('cells.')
+        pos2 = pos1 + param_name[pos1:].find('.')
+        cell_ind = int(param_name[pos1: pos2])
+    elif param_name.startswith('classifier') or param_name.startswith('auxiliary'):
+        cell_ind = layers - 1
+    elif layers == 1 or param_name.startswith('stem') or param_name.startswith('pos_enc'):
+        cell_ind = 0
+    else:
+        cell_ind = None
+
+    return cell_ind
+
+
+def named_layered_modules(model):
+    if hasattr(model, 'module'):  # in case of multigpu model
+        model = model.module
+    layers = model._n_cells if hasattr(model, '_n_cells') else 1
+    layered_modules = [[] for _ in range(layers)]
+    for module_name, m in model.named_modules():
+        is_w = hasattr(m, 'weight') and m.weight is not None
+        is_b = hasattr(m, 'bias') and m.bias is not None
+
+        if is_w or is_b:
+            if module_name.startswith('module.'):
+                module_name = module_name[module_name.find('.') + 1:]
+            cell_ind = get_cell_ind(module_name, layers)
+            if is_w:
+                layered_modules[cell_ind].append(
+                    {'param_name': module_name + '.weight', 'module': m, 'is_w': True, 'sz': m.weight.shape})
+            if is_b:
+                layered_modules[cell_ind].append(
+                    {'param_name': module_name + '.bias', 'module': m, 'is_w': False, 'sz': m.bias.shape})
+
+    return layered_modules
+
+
 class GHN(nn.Module):
     r"""
     Graph HyperNetwork based on "Chris Zhang, Mengye Ren, Raquel Urtasun. Graph HyperNetworks for Neural Architecture Search. ICLR 2019."
@@ -80,6 +135,7 @@ class GHN(nn.Module):
     def __init__(self,
                  max_shape,
                  num_classes,
+                 architecture,
                  hypernet='gatedgnn',
                  decoder='conv',
                  weight_norm=False,
@@ -90,6 +146,7 @@ class GHN(nn.Module):
         super(GHN, self).__init__()
 
         assert len(max_shape) == 4, max_shape
+        self.architecture = architecture
         self.layernorm = layernorm
         self.weight_norm = weight_norm
         self.ve = ve
@@ -353,7 +410,6 @@ class GHN(nn.Module):
 
         return mapping, params_map
 
-
     def _tile_params(self, w, target_shape):
         r"""
         Makes the shape of predicted parameter tensors the same as the target shape by tiling/slicing across channels dimensions.
@@ -407,7 +463,6 @@ class GHN(nn.Module):
 
         return w
 
-
     def _set_params(self, module, tensor, is_w):
         r"""
         Copies the predicted parameter tensor to the appropriate field of the module object.
@@ -435,7 +490,6 @@ class GHN(nn.Module):
         assert sz_target == set_param.shape, (sz_target, set_param.shape)
         return set_param.shape
 
-
     def _normalize(self, module, p, is_w):
         r"""
         Normalizes the predicted parameter tensor according to the Fan-In scheme described in the paper.
@@ -448,16 +502,12 @@ class GHN(nn.Module):
 
             sz = p.shape
 
-            if len(sz) > 2 and sz[2] >= 11 and sz[0] == 1:
-                assert isinstance(module, PosEnc), (sz, module)
-                return p    # do not normalize positional encoding weights
-
             no_relu = len(sz) > 2 and (sz[1] == 1 or sz[2] < sz[3])
             if no_relu:
                 # layers not followed by relu
                 beta = 1.
             else:
-                # for layers followed by rely increase the weight scale
+                # for layers followed by relu increase the weight scale
                 beta = 2.
 
             # fan-out:

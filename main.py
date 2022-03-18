@@ -82,7 +82,7 @@ def main():
     elif args.dataset == 'seq-cifar10':
         backbone = resnet18(10)
     else:
-        backbone = resnet18(100)
+        backbone = resnet18(200)
 
     loss = dataset.get_loss()
     model = get_model(args, backbone, loss, dataset.get_transform())
