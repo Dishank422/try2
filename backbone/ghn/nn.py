@@ -109,7 +109,6 @@ class GHN(nn.Module):
         super(GHN, self).__init__()
 
         assert len(max_shape) == 4, max_shape
-        self.architecture = architecture
         self.layernorm = layernorm
         self.weight_norm = weight_norm
         self.ve = ve
@@ -148,6 +147,8 @@ class GHN(nn.Module):
         self.bias_class = nn.Sequential(nn.ReLU(),
                                         nn.Linear(max_ch, num_classes))
 
+        self.architecture = architecture
+        self.graphs = GraphBatch([Graph(self.architecture, ve_cutoff=50 if self.ve else 1)])
 
     @staticmethod
     def load(checkpoint_path, debug_level=1, device=get_device(), verbose=False):
@@ -175,7 +176,7 @@ class GHN(nn.Module):
         :return: nets_torch with predicted parameters and node embeddings if return_embeddings=True
         """
         nets_torch = self.architecture
-        graphs = GraphBatch([Graph(nets_torch, ve_cutoff=50 if self.ve else 1)])
+        graphs = self.graphs
         graphs.to_device(self.embed.weight.device)
 
         if not self.training:

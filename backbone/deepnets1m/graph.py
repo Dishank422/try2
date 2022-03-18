@@ -337,10 +337,11 @@ class Graph:
             return node_link, fn_name
 
         var = self.model(torch.randn(1, *self.expected_input_sz))
+
         # take only the first output, but can in principle handle multiple outputs, e.g. from auxiliary classifiers
         traverse_graph((var[0] if isinstance(var, (tuple, list)) else var).grad_fn)  # populate nodes and edges
 
-        nodes_lookup = { node['id']: i  for i, node in enumerate(nodes) }
+        nodes_lookup = {node['id']: i for i, node in enumerate(nodes) }
         A = np.zeros((len(nodes) + 1, len(nodes) + 1))  # +1 for the input node added below
         for out_node_id, in_node_id in edges:
             A[nodes_lookup[out_node_id], nodes_lookup[in_node_id]] = 1
