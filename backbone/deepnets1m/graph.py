@@ -23,7 +23,7 @@ from .net import get_cell_ind
 from .genotypes import PRIMITIVES_DEEPNETS1M
 
 
-class GraphBatch():
+class GraphBatch:
     r"""
     Container for a batch of Graph objects.
 
@@ -44,7 +44,6 @@ class GraphBatch():
             for graph in graphs:
                 self.append(graph)
 
-
     def append(self, graph):
         graph_offset = len(self.n_nodes)                    # current index of the graph in a batch
         self.n_nodes.append(len(graph.node_feat))           # number of nodes
@@ -57,7 +56,6 @@ class GraphBatch():
         self.node_info.append(graph.node_info)      # op names, ids, etc.
         self.net_args.append(graph.net_args)        # a dictionary of arguments to construct a Network object
         self.net_inds.append(graph.net_idx)         # network integer identifier (optional)
-
 
     def scatter(self, device_ids, nets):
         """
@@ -100,7 +98,6 @@ class GraphBatch():
 
         return batch_lst
 
-
     def to_device(self, device):
         if isinstance(device, (tuple, list)):
             device = device[0]
@@ -109,7 +106,6 @@ class GraphBatch():
         self.node_feat = self.node_feat.to(device)
         self.edges = self.edges.to(device)
         return self
-
 
     def _sort_by_nodes(self, num_devices, graphs_per_device):
         """
@@ -159,7 +155,6 @@ class GraphBatch():
         self.edges = edges
         return idx
 
-
     def _cat(self):
         if not isinstance(self.n_nodes, torch.Tensor):
             self.n_nodes = torch.tensor(self.n_nodes, dtype=torch.long)
@@ -167,7 +162,6 @@ class GraphBatch():
             self.node_feat = torch.cat(self.node_feat)
         if not isinstance(self.edges, torch.Tensor):
             self.edges = torch.cat(self.edges)
-
 
     def __getitem__(self, idx):
         return self.graphs[idx]
@@ -180,7 +174,7 @@ class GraphBatch():
             yield graph
 
 
-class Graph():
+class Graph:
     r"""
     Container for a computational graph of a neural network.
 
@@ -226,7 +220,6 @@ class Graph():
         self.net_args = net_args
         self.net_idx = net_idx
 
-
     def num_valid_nodes(self, model=None):
         r"""
         Counts the total number of learnable parameter tensors.
@@ -263,7 +256,6 @@ class Graph():
                     #     print(name, p.shape, s)
 
         return valid_ops
-
 
     def _build_graph(self):
         r"""
@@ -388,7 +380,6 @@ class Graph():
 
         return
 
-
     def _filter_graph(self):
         r"""
         Remove redundant/unsupported nodes from the automatically constructed graphs.
@@ -454,7 +445,6 @@ class Graph():
 
         return
 
-
     def _add_virtual_edges(self, ve_cutoff=50):
         r"""
         Add virtual edges with weights equal the shortest path length between the nodes.
@@ -487,7 +477,6 @@ class Graph():
                         self._Adj[node1, node2] = length[node1][node2]
             assert (self._Adj > ve_cutoff).sum() == 0, ((self._Adj > ve_cutoff).sum(), ve_cutoff)
         return self._Adj
-
 
     def _construct_features(self):
         r"""
@@ -579,7 +568,6 @@ class Graph():
         self.edges = torch.cat((ind, self._Adj[ind[:, 0], ind[:, 1]].view(-1, 1)), dim=1)
         return
 
-
     def _named_modules(self):
         r"""
         Helper function to automatically build the graphs.
@@ -596,7 +584,6 @@ class Graph():
                 modules[n + '.bias'] = (m.bias, m)
         return modules
 
-
     def _nx_graph_from_adj(self):
         """
         Creates NetworkX directed graph instance that is used for visualization, virtual edges and graph statistics.
@@ -607,7 +594,6 @@ class Graph():
             A[A > 1] = 0  # remove any virtual edges for the visualization/statistics
             self.nx_graph = nx.DiGraph(A)
         return self.nx_graph
-
 
     def properties(self, undirected=True, key=('avg_degree', 'avg_path')):
         """
@@ -631,7 +617,6 @@ class Graph():
                 raise NotImplementedError(prop)
 
         return props
-
 
     def visualize(self, node_size=50, figname=None, figsize=None, with_labels=False, vis_legend=False, label_offset=0.001, font_size=10):
         r"""
@@ -740,6 +725,7 @@ def get_conv_name(module, param_name):
     elif isinstance(module, nn.Conv2d) and module.groups > 1:
         return ('dil_conv' if min(module.dilation) > 1 else 'sep_conv')
     return 'conv'
+
 
 # Supported modules
 MODULES = {

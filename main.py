@@ -17,6 +17,7 @@ from utils.best_args import best_args
 from utils.conf import set_random_seed
 from backbone.MNISTMLP import MNISTMLP
 from backbone.ResNet18 import resnet18
+from backbone.ghn.nn import GHN
 
 
 def main():
@@ -80,7 +81,7 @@ def main():
     elif args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist']:
         backbone = MNISTMLP(28*28, 10)
     elif args.dataset == 'seq-cifar10':
-        backbone = resnet18(10)
+        backbone = GHN([64, 64, 11, 11], 10, resnet18(10))
     else:
         backbone = resnet18(200)
 

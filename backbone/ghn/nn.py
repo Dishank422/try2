@@ -18,7 +18,8 @@ from .gatedgnn import GatedGNN
 from .decoder import MLPDecoder, ConvDecoder
 from .layers import ShapeEncoder
 from ..deepnets1m.graph import Graph, GraphBatch
-from ...utils.conf import capacity, get_device
+from ..deepnets1m.net import named_layered_modules
+from utils.conf import capacity, get_device
 import time
 
 PRIMITIVES_DEEPNETS1M = [
@@ -86,44 +87,6 @@ def ghn_parallel(ghn):
     ghn.gather = gather
 
     return ghn
-
-
-def get_cell_ind(param_name, layers=1):
-    if param_name.find('cells.') >= 0:
-        pos1 = len('cells.')
-        pos2 = pos1 + param_name[pos1:].find('.')
-        cell_ind = int(param_name[pos1: pos2])
-    elif param_name.startswith('classifier') or param_name.startswith('auxiliary'):
-        cell_ind = layers - 1
-    elif layers == 1 or param_name.startswith('stem') or param_name.startswith('pos_enc'):
-        cell_ind = 0
-    else:
-        cell_ind = None
-
-    return cell_ind
-
-
-def named_layered_modules(model):
-    if hasattr(model, 'module'):  # in case of multigpu model
-        model = model.module
-    layers = model._n_cells if hasattr(model, '_n_cells') else 1
-    layered_modules = [[] for _ in range(layers)]
-    for module_name, m in model.named_modules():
-        is_w = hasattr(m, 'weight') and m.weight is not None
-        is_b = hasattr(m, 'bias') and m.bias is not None
-
-        if is_w or is_b:
-            if module_name.startswith('module.'):
-                module_name = module_name[module_name.find('.') + 1:]
-            cell_ind = get_cell_ind(module_name, layers)
-            if is_w:
-                layered_modules[cell_ind].append(
-                    {'param_name': module_name + '.weight', 'module': m, 'is_w': True, 'sz': m.weight.shape})
-            if is_b:
-                layered_modules[cell_ind].append(
-                    {'param_name': module_name + '.bias', 'module': m, 'is_w': False, 'sz': m.bias.shape})
-
-    return layered_modules
 
 
 class GHN(nn.Module):
@@ -195,7 +158,7 @@ class GHN(nn.Module):
             print('GHN with {} parameters loaded from epoch {}.'.format(capacity(ghn)[1], state_dict['epoch']))
         return ghn
 
-    def forward(self, nets_torch, graphs=None, return_embeddings=False, predict_class_layers=True, bn_train=True):
+    def forward(self, images, return_embeddings=False, predict_class_layers=True, bn_train=True):
         r"""
         Predict parameters for a list of >=1 networks.
         :param nets_torch: one network or a list of networks, each is based on nn.Module.
@@ -208,29 +171,18 @@ class GHN(nn.Module):
                                      predict_class_layers=False is used in fine-tuning experiments.
         :param bn_train: default=True sets BN layers in nets_torch into the training mode (required to evaluate predicted parameters)
                         bn_train=False is used in fine-tuning experiments
+        :images: input images to GHN
         :return: nets_torch with predicted parameters and node embeddings if return_embeddings=True
         """
+        nets_torch = self.architecture
+        graphs = GraphBatch([Graph(nets_torch, ve_cutoff=50 if self.ve else 1)])
+        graphs.to_device(self.embed.weight.device)
 
         if not self.training:
-            assert isinstance(nets_torch,
-                              nn.Module) or len(nets_torch) == 1, \
-                'constructing the graph on the fly is only supported for a single network'
-
-            if isinstance(nets_torch, list):
-                nets_torch = nets_torch[0]
-
             if self.debug_level:
                 if self.debug_level > 1:
                     valid_ops = graphs[0].num_valid_nodes(nets_torch)
                 start_time = time.time()  # do not count any debugging steps above
-
-            if graphs is None:
-                graphs = GraphBatch([Graph(nets_torch, ve_cutoff=50 if self.ve else 1)])
-                graphs.to_device(self.embed.weight.device)
-
-        else:
-            assert graphs is not None, \
-                'constructing the graph on the fly is only supported in the evaluation mode'
 
         # Find mapping between embeddings and network parameters
         param_groups, params_map = self._map_net_params(graphs, nets_torch, self.debug_level > 0)
@@ -334,7 +286,7 @@ class GHN(nn.Module):
             assert n_params == n_params_true, ('number of predicted ({}) or actual ({}) parameters must match'.format(
                 n_params, n_params_true))
 
-        return (nets_torch, x) if return_embeddings else nets_torch
+        return (nets_torch(images), x) if return_embeddings else nets_torch(images)
 
     def _map_net_params(self, graphs, nets_torch, sanity_check=False):
         r"""

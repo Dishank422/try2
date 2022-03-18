@@ -13,8 +13,17 @@ Some functionality in this script is based on the DARTS code: https://github.com
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 from .ops import OPS, ReLUConvBN, FactorizedReduce, PosEnc, Zero, Stride, parse_op_ks, get_norm_layer
-from ..utils import drop_path
+
+
+def drop_path(x, drop_prob):
+    if drop_prob > 0.:
+        keep_prob = 1. - drop_prob
+        mask = Variable(torch.cuda.FloatTensor(x.size(0), 1, 1, 1).bernoulli_(keep_prob))
+        x.div_(keep_prob)
+        x.mul_(mask)
+    return
 
 
 class Cell(nn.Module):
@@ -47,7 +56,6 @@ class Cell(nn.Module):
             concat = genotype.normal_concat
         self._compile(C_in, C_out, op_names, indices, concat, reduction, norm)
 
-
     def _compile(self, C_in, C_out, op_names, indices, concat, reduction, norm):
         assert len(op_names) == len(indices)
         self._steps = len(op_names) // 2
@@ -61,7 +69,6 @@ class Cell(nn.Module):
             self._ops.append(OPS[name](C_in if index <= 1 else C_out, C_out, ks, stride, norm))
 
         self._indices = indices
-
 
     def forward(self, s0, s1, drop_path_prob=0):
 
@@ -93,7 +100,6 @@ class Cell(nn.Module):
                     raise
 
             states.append(s)
-
 
         if sum([states[i] is None for i in self._concat]) > 0:
             # Replace None states with Zeros to match feature dimensionalities and enable forward pass
@@ -296,7 +302,6 @@ class Network(nn.Module):
             for p in self.parameters():
                 p.data = p.data.bool()
 
-
     def forward(self, input):
 
         if self._is_vit:
@@ -327,6 +332,7 @@ class Network(nn.Module):
 """
 Helper functions to train GHNs and work with DeepNets-1M.
 """
+
 
 def _is_none(mod):
     for n, p in mod.named_modules():
