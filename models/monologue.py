@@ -49,3 +49,6 @@ class monologue(ContinualModel):
         model_dir = os.path.join(self.args.output_dir, "task_models", dataset.NAME, self.args.experiment_id)
         os.makedirs(model_dir, exist_ok=True)
         torch.save(self.net, os.path.join(model_dir, f'task_{self.current_task}_model.ph'))
+        # for p in self.net.architecture.parameters():
+        #     if p.requires_grad:
+        #         print(p.shape)

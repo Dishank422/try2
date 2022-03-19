@@ -21,6 +21,7 @@ from matplotlib import cm as cm
 from .ops import NormLayers, PosEnc
 from .net import get_cell_ind
 from .genotypes import PRIMITIVES_DEEPNETS1M
+from utils.conf import get_device
 
 
 class GraphBatch:

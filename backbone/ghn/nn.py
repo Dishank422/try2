@@ -287,7 +287,12 @@ class GHN(nn.Module):
             assert n_params == n_params_true, ('number of predicted ({}) or actual ({}) parameters must match'.format(
                 n_params, n_params_true))
 
-        return (nets_torch(images), x) if return_embeddings else nets_torch(images)
+        out_ = nets_torch(images)
+        if self.training:
+            self.architecture = nets_torch
+            nets_torch.to('cpu')
+            self.graphs = GraphBatch([Graph(self.architecture, ve_cutoff=50 if self.ve else 1)])
+        return (nets_torch(images), x) if return_embeddings else out_
 
     def _map_net_params(self, graphs, nets_torch, sanity_check=False):
         r"""
