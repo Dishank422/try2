@@ -44,8 +44,10 @@ def evaluate(model: ContinualModel, dataset: ContinualDataset, last=False, eval_
     :return: a tuple of lists, containing the class-il
              and task-il accuracy for each task
     """
-
-    curr_model = model.net
+    if model.NAME == 'monologue':
+        curr_model = model
+    else:
+        curr_model = model.net
     if eval_ema:
         if ema_model == 'stable_model':
             print('setting evaluation model to stable model')

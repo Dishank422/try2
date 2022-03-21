@@ -58,6 +58,8 @@ def add_management_args(parser: ArgumentParser) -> None:
     parser.add_argument('--validation', action='store_true',
                         help='Test on the validation set')
     parser.add_argument('--output_dir', type=str, default='experiments')
+    parser.add_argument('--fine_tune', action='store_true', default=False,
+                        help='To fine tune or not to fine tune.')
 
 
 def add_rehearsal_args(parser: ArgumentParser) -> None:
