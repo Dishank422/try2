@@ -60,6 +60,8 @@ def add_management_args(parser: ArgumentParser) -> None:
     parser.add_argument('--output_dir', type=str, default='experiments')
     parser.add_argument('--fine_tune', action='store_true', default=False,
                         help='To fine tune or not to fine tune.')
+    parser.add_argument('--consolidate', action='store_true', default=False,
+                        help='To consolidate or not to consolidate.')
 
 
 def add_rehearsal_args(parser: ArgumentParser) -> None:

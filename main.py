@@ -81,7 +81,7 @@ def main():
     elif args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist']:
         backbone = MNISTMLP(28*28, 10)
     elif args.dataset == 'seq-cifar10':
-        backbone = GHN([64, 64, 11, 11], 10, resnet18(10), weight_norm=True, layernorm=True, ve=True)
+        backbone = GHN([64, 64, 11, 11], 10, resnet18(10), weight_norm=True, layernorm=True, ve=True, T=args.T, n_tasks=dataset.N_TASKS if args.consolidate else None)
     else:
         backbone = resnet18(200)
 

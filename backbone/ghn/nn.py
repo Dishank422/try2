@@ -105,7 +105,9 @@ class GHN(nn.Module):
                  ve=False,
                  layernorm=False,
                  hid=32,
-                 debug_level=0):
+                 T=1,
+                 debug_level=0,
+                 n_tasks=None):
         super(GHN, self).__init__()
 
         assert len(max_shape) == 4, max_shape
@@ -124,7 +126,7 @@ class GHN(nn.Module):
                                       max_shape=max_shape,
                                       debug_level=debug_level)
         if hypernet == 'gatedgnn':
-            self.gnn = GatedGNN(in_features=hid, ve=ve)
+            self.gnn = GatedGNN(in_features=hid, ve=ve, T=T, n_tasks=n_tasks)
         elif hypernet == 'mlp':
             self.gnn = MLP(in_features=hid, hid=(hid, hid))
         else:
@@ -159,7 +161,7 @@ class GHN(nn.Module):
             print('GHN with {} parameters loaded from epoch {}.'.format(capacity(ghn)[1], state_dict['epoch']))
         return ghn
 
-    def forward(self, images, return_embeddings=False, predict_class_layers=True, bn_train=True):
+    def forward(self, images=None, return_embeddings=False, predict_class_layers=True, bn_train=True, task_embedding=None):
         r"""
         Predict parameters for a list of >=1 networks.
         :param nets_torch: one network or a list of networks, each is based on nn.Module.
@@ -198,7 +200,7 @@ class GHN(nn.Module):
         x = self.shape_enc(self.embed(graphs.node_feat[:, 0]), params_map, predict_class_layers=predict_class_layers)
 
         # Update node embeddings using a GatedGNN, MLP or another model
-        x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1])
+        x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1], task_embedding=task_embedding)
 
         if self.layernorm:
             x = self.ln(x)
@@ -287,7 +289,8 @@ class GHN(nn.Module):
             assert n_params == n_params_true, ('number of predicted ({}) or actual ({}) parameters must match'.format(
                 n_params, n_params_true))
 
-        return nets_torch(images)
+        if images is not None:
+            return nets_torch(images)
         # return (nets_torch(images), x) if return_embeddings else nets_torch(images)
 
     def _map_net_params(self, graphs, nets_torch, sanity_check=False):

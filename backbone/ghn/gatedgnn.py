@@ -18,7 +18,8 @@ class GatedGNN(nn.Module):
     def __init__(self,
                  in_features=32,
                  ve=False,
-                 T=1):
+                 T=1,
+                 n_tasks=None):
         """
         Initializes Gated Graph Neural Network.
         :param in_features: how many features in each node.
@@ -31,13 +32,14 @@ class GatedGNN(nn.Module):
         self.ve = ve
         self.T = T
         self.mlp = MLP(in_features, hid=( (self.hid // 2) if ve else self.hid, self.hid))
+        if n_tasks is not None:
+            self.g = MLP(n_tasks+2*in_features, hid=(self.hid, self.hid))
         if ve:
             self.mlp_ve = MLP(in_features, hid=(self.hid // 2, self.hid))
 
         self.gru = nn.GRUCell(self.hid, self.hid)  # shared across all nodes/cells in a graph
 
-
-    def forward(self, x, edges, node_graph_ind):
+    def forward(self, x, edges, node_graph_ind, task_embedding):
         r"""
         Updates node features by sequentially traversing the graph in the forward and backward directions.
         :param x: (N, C) node features, where N is the total number of nodes in a batch of B graphs, C is node feature dimensionality.
@@ -101,6 +103,8 @@ class GatedGNN(nn.Module):
                     ind = torch.nonzero(mask2d[:, node]).view(-1)
                     if B > 1:
                         m = m[node_graph_ind[ind]]
+                    if task_embedding is not None:
+                        m += self.g(torch.cat((task_embedding.view((-1, len(task_embedding))), m, hx[ind]), axis=1))
                     hx[ind] = self.gru(m, hx[ind]).to(hx)  # 'to(hx)' is to make automatic mixed precision work
 
         return hx
