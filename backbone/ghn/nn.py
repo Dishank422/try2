@@ -204,6 +204,7 @@ class GHN(nn.Module):
 
         # Update node embeddings using a GatedGNN, MLP or another model
         x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1], task_embedding=None)
+        embeds = x
 
         if self.layernorm:
             x = self.ln(x)
@@ -293,7 +294,9 @@ class GHN(nn.Module):
                 n_params, n_params_true))
 
         if images is not None:
-            return nets_torch(images)
+            return nets_torch(images), embeds
+        else:
+            return embeds
         # return (nets_torch(images), x) if return_embeddings else nets_torch(images)
 
     def _map_net_params(self, graphs, nets_torch, sanity_check=False):

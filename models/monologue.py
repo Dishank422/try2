@@ -31,6 +31,7 @@ class monologue(ContinualModel):
         self.opt = Adam(self.net.parameters(), lr=self.args.lr)
         self.task_aggregate = torch.zeros(5 if self.args.dataset != 'seq-tinyimg' else 10).to(self.device) if args.consolidate else None
         self.task_embedding = torch.zeros(5 if self.args.dataset != 'seq-tinyimg' else 10).to(self.device) if args.consolidate else None
+        self.node_embeds = []
 
     def begin_task(self, dataset):
         if self.args.consolidate:
@@ -48,22 +49,26 @@ class monologue(ContinualModel):
             inputs = torch.cat((inputs, buf_inputs))
             labels = torch.cat((labels, buf_labels))
 
-        outputs = self.net(inputs, task_embedding=self.task_embedding)
+        outputs, embeds = self.net(inputs, task_embedding=self.task_embedding)
         loss = self.loss(outputs, labels)
+        loss_images = loss
+        for i in range(len(self.node_embeds)):
+            loss += torch.nn.MSELoss(embeds, self.node_embeds[i])
         loss.backward()
         self.opt.step()
 
         self.buffer.add_data(examples=not_aug_inputs,
                              labels=labels[:real_batch_size])
 
-        return loss.item()
+        return loss_images.item()
 
     def end_task(self, dataset) -> None:
         self.current_task += 1
         if self.args.consolidate:
             self.task_aggregate += self.task_embedding
 
-        self.net(task_embedding=self.task_aggregate)  # predict all parameters of architecture
+        embeds = self.net(task_embedding=self.task_aggregate)  # predict all parameters of architecture
+        self.node_embeds.append(embeds)
 
         if self.args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist']:
             unfine_tuned = MNISTMLP(28 * 28, 10)
