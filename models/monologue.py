@@ -53,7 +53,7 @@ class monologue(ContinualModel):
         loss = self.loss(outputs, labels)
         loss_images = loss
         for i in range(len(self.node_embeds)):
-            loss += torch.nn.MSELoss(embeds, self.node_embeds[i])
+            loss += torch.nn.functional.mse_loss(embeds, self.node_embeds[i])
         loss.backward()
         self.opt.step()
 
@@ -68,7 +68,7 @@ class monologue(ContinualModel):
             self.task_aggregate += self.task_embedding
 
         embeds = self.net(task_embedding=self.task_aggregate)  # predict all parameters of architecture
-        self.node_embeds.append(embeds)
+        self.node_embeds.append(embeds.detach())
 
         if self.args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist']:
             unfine_tuned = MNISTMLP(28 * 28, 10)
