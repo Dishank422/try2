@@ -151,8 +151,8 @@ class GHN(nn.Module):
 
         self.architecture = architecture
         self.graphs = GraphBatch([Graph(self.architecture, ve_cutoff=50 if self.ve else 1)])
-
-        self.embedding_enhancer = MLP(in_features=n_tasks, hid=(hid, hid))
+        if n_tasks is not None:
+            self.embedding_enhancer = MLP(in_features=n_tasks, hid=(hid, hid))
 
     @staticmethod
     def load(checkpoint_path, debug_level=1, device=get_device(), verbose=False):
@@ -200,7 +200,8 @@ class GHN(nn.Module):
 
         # Obtain initial embeddings for all nodes
         x = self.shape_enc(self.embed(graphs.node_feat[:, 0]), params_map, predict_class_layers=predict_class_layers)
-        x = self.embedding_enhancer(task_embedding) + x
+        if task_embedding is not None:
+            x = self.embedding_enhancer(task_embedding) + x
 
         # Update node embeddings using a GatedGNN, MLP or another model
         x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1], task_embedding=None)

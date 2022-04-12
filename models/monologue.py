@@ -68,7 +68,8 @@ class monologue(ContinualModel):
             self.task_aggregate += self.task_embedding
 
         embeds = self.net(task_embedding=self.task_aggregate)  # predict all parameters of architecture
-        self.node_embeds.append(embeds.detach())
+        if self.args.consolidate:
+            self.node_embeds.append(embeds.detach())
 
         if self.args.dataset in ['seq-mnist', 'perm-mnist', 'rot-mnist']:
             unfine_tuned = MNISTMLP(28 * 28, 10)
