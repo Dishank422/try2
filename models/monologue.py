@@ -59,7 +59,6 @@ class monologue(ContinualModel):
         return loss.item()
 
     def end_task(self, dataset) -> None:
-        self.current_task += 1
         if self.args.consolidate:
             self.task_aggregate += self.task_embedding
 
@@ -87,6 +86,11 @@ class monologue(ContinualModel):
                     fine_tune_opt.step()
 
         self.fine_tuned = unfine_tuned
+        # if self.current_task == 0:
+        #     self.fine_tuned.pop(0)
+
+        # self.fine_tuned.append(unfine_tuned)
+        # self.current_task += 1
 
         model_dir = os.path.join(self.args.output_dir, "task_models", dataset.NAME, self.args.experiment_id)
         os.makedirs(model_dir, exist_ok=True)
@@ -94,3 +98,7 @@ class monologue(ContinualModel):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.fine_tuned(x)
+        # preds = []
+        # for model in self.fine_tuned:
+        #     preds += model(x)
+        # return preds
