@@ -126,7 +126,7 @@ class GHN(nn.Module):
                                       max_shape=max_shape,
                                       debug_level=debug_level)
         if hypernet == 'gatedgnn':
-            self.gnn = GatedGNN(in_features=hid, ve=ve, T=T, n_tasks=n_tasks)
+            self.gnn = GatedGNN(in_features=hid, ve=ve, T=T)
         elif hypernet == 'mlp':
             self.gnn = MLP(in_features=hid, hid=(hid, hid))
         else:
@@ -204,8 +204,7 @@ class GHN(nn.Module):
             x = self.embedding_enhancer(task_embedding) + x
 
         # Update node embeddings using a GatedGNN, MLP or another model
-        x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1], task_embedding=None)
-        embeds = x
+        x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1])
 
         if self.layernorm:
             x = self.ln(x)
@@ -294,11 +293,11 @@ class GHN(nn.Module):
             assert n_params == n_params_true, ('number of predicted ({}) or actual ({}) parameters must match'.format(
                 n_params, n_params_true))
 
-        if images is not None:
-            return nets_torch(images), embeds
-        else:
-            return embeds
-        # return (nets_torch(images), x) if return_embeddings else nets_torch(images)
+        # if images is not None:
+        #     return nets_torch(images), embeds
+        # else:
+        #     return embeds
+        return (nets_torch(images), x) if images is not None else x
 
     def _map_net_params(self, graphs, nets_torch, sanity_check=False):
         r"""

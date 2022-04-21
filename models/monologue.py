@@ -49,25 +49,28 @@ class monologue(ContinualModel):
             inputs = torch.cat((inputs, buf_inputs))
             labels = torch.cat((labels, buf_labels))
 
-        outputs, embeds = self.net(inputs, task_embedding=self.task_embedding)
+        outputs, embeds = self.net(inputs, return_embeddings=True, task_embedding=self.task_embedding)
+
         loss = self.loss(outputs, labels)
-        loss_images = loss
-        for i in range(len(self.node_embeds)):
-            loss += torch.nn.functional.mse_loss(embeds, self.node_embeds[i])
+
+        if self.args.consolidate:
+            for i in range(len(self.node_embeds)):
+                loss += torch.nn.functional.mse_loss(embeds, self.node_embeds[i])
+
         loss.backward()
         self.opt.step()
 
         self.buffer.add_data(examples=not_aug_inputs,
                              labels=labels[:real_batch_size])
 
-        return loss_images.item()
+        return loss.item()
 
     def end_task(self, dataset) -> None:
         self.current_task += 1
         if self.args.consolidate:
             self.task_aggregate += self.task_embedding
 
-        embeds = self.net(task_embedding=self.task_aggregate)  # predict all parameters of architecture
+        embeds = self.net(return_embeddings=True, task_embedding=self.task_aggregate)  # predict all parameters of architecture
         if self.args.consolidate:
             self.node_embeds.append(embeds.detach())
 
