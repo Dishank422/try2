@@ -49,7 +49,7 @@ class monologue(ContinualModel):
             inputs = torch.cat((inputs, buf_inputs))
             labels = torch.cat((labels, buf_labels))
 
-        distribution = torch.distributions.multivariate_normal.MultivariateNormal(self.task_embedding, 0.01*torch.eye(len(self.task_embedding)).to(self.device))
+        distribution = torch.distributions.multivariate_normal.MultivariateNormal(self.task_embedding, 0.001*torch.eye(len(self.task_embedding)).to(self.device))
         outputs, embeds = self.net(inputs, return_embeddings=True, task_embedding=distribution.sample())
 
         loss = self.loss(outputs, labels)
@@ -72,9 +72,9 @@ class monologue(ContinualModel):
         if self.args.consolidate:
             self.task_aggregate += self.task_embedding
 
-        for _ in range(30):
-            distribution = torch.distributions.multivariate_normal.MultivariateNormal(self.task_aggregate,
-                                                                                      0.01 * torch.eye(
+        for _ in range(100):
+            distribution = torch.distributions.multivariate_normal.MultivariateNormal(self.task_aggregate/self.current_task,
+                                                                                      0.001 * torch.eye(
                                                                                           len(self.task_embedding)).to(
                                                                                           self.device))
             embeds = self.net(return_embeddings=True, task_embedding=distribution.sample())  # predict all parameters of architecture
