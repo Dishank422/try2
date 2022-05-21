@@ -72,7 +72,7 @@ class monologue(ContinualModel):
         if self.args.consolidate:
             self.task_aggregate += self.task_embedding
 
-        for _ in range(100):
+        for _ in range(1):
             distribution = torch.distributions.multivariate_normal.MultivariateNormal(self.task_aggregate/self.current_task,
                                                                                       0.001 * torch.eye(
                                                                                           len(self.task_embedding)).to(
