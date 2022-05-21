@@ -201,7 +201,10 @@ class GHN(nn.Module):
         # Obtain initial embeddings for all nodes
         x = self.shape_enc(self.embed(graphs.node_feat[:, 0]), params_map, predict_class_layers=predict_class_layers)
         if task_embedding is not None:
-            x = self.embedding_enhancer(task_embedding) + x
+            mean = self.embedding_enhancer(task_embedding)
+            distribution = torch.distributions.multivariate_normal.MultivariateNormal(mean, 0.001 * torch.eye(32).to(self.embed.weight.device))
+
+            x = distribution.sample() + x
 
         # Update node embeddings using a GatedGNN, MLP or another model
         x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1])
