@@ -204,7 +204,7 @@ class GHN(nn.Module):
             mean = self.embedding_enhancer(task_embedding)
             distribution = torch.distributions.multivariate_normal.MultivariateNormal(mean, 0.001 * torch.eye(32).to(self.embed.weight.device))
 
-            x = distribution.sample() + x
+            # x = distribution.sample() + x
 
         # Update node embeddings using a GatedGNN, MLP or another model
         x = self.gnn(x, graphs.edges, graphs.node_feat[:, 1])
