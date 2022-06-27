@@ -7,6 +7,10 @@ from models.utils.continual_model import ContinualModel
 from torch.optim import SGD, Adam
 from backbone.ResNet18 import resnet18
 from backbone.MNISTMLP import MNISTMLP
+from torch.autograd import Variable
+import torch.nn as nn
+from copy import deepcopy
+from utils.conf import get_device
 
 
 def get_parser() -> ArgumentParser:
@@ -16,6 +20,54 @@ def get_parser() -> ArgumentParser:
     add_experiment_args(parser)
     add_rehearsal_args(parser)
     return parser
+
+
+def variable(t: torch.Tensor, use_cuda=True, **kwargs):
+    if torch.cuda.is_available() and use_cuda:
+        t = t.cuda()
+    return Variable(t, **kwargs)
+
+
+class EWC(object):
+    def __init__(self, model: nn.Module, dataset: list):
+
+        self.model = model
+        self.dataset = dataset
+
+        self.params = {n: p for n, p in self.model.named_parameters() if p.requires_grad}
+        self._means = {}
+        self._precision_matrices = self._diag_fisher()
+
+        for n, p in deepcopy(self.params).items():
+            self._means[n] = variable(p.data)
+
+    def _diag_fisher(self):
+        precision_matrices = {}
+        for n, p in deepcopy(self.params).items():
+            p.data.zero_()
+            precision_matrices[n] = variable(p.data)
+
+        self.model.eval()
+        for input in self.dataset:
+            self.model.zero_grad()
+            input = variable(input)
+            output = self.model(input).view(1, -1)
+            label = output.max(1)[1].view(-1)
+            loss = F.nll_loss(F.log_softmax(output, dim=1), label)
+            loss.backward()
+
+            for n, p in self.model.named_parameters():
+                precision_matrices[n].data += p.grad.data ** 2 / len(self.dataset)
+
+        precision_matrices = {n: p for n, p in precision_matrices.items()}
+        return precision_matrices
+
+    def penalty(self, model: nn.Module):
+        loss = 0
+        for n, p in model.named_parameters():
+            _loss = self._precision_matrices[n] * (p - self._means[n]) ** 2
+            loss += _loss.sum()
+        return loss
 
 
 class monologue(ContinualModel):
@@ -32,6 +84,7 @@ class monologue(ContinualModel):
         self.task_aggregate = torch.zeros(5 if self.args.dataset != 'seq-tinyimg' else 10).to(self.device) if args.consolidate else None
         self.task_embedding = torch.zeros(5 if self.args.dataset != 'seq-tinyimg' else 10).to(self.device) if args.consolidate else None
         self.node_embeds = []
+        self.precision_matrices = []
 
     def begin_task(self, dataset):
         if self.args.consolidate:
@@ -52,12 +105,21 @@ class monologue(ContinualModel):
         outputs, embeds = self.net(inputs, return_embeddings=True, task_embedding=self.task_embedding)
 
         loss = self.loss(outputs, labels)
+        importance = 0.1
 
-        if self.args.consolidate:
-            for i in range(len(self.node_embeds)):
-                loss += torch.nn.functional.mse_loss(embeds, self.node_embeds[i])
+        # if self.args.consolidate:
+        #     for i in range(len(self.node_embeds)):
+        #         loss += importance * torch.nn.functional.mse_loss(self.precision_matrices[i]*embeds, self.precision_matrices[i]*self.node_embeds[i])
+
+        # if self.args.consolidate:
+        #     if self.node_embeds:
+        #         loss += importance * torch.nn.functional.mse_loss(self.precision_matrices[-1]*embeds, self.precision_matrices[-1]*self.node_embeds[-1])
 
         loss.backward()
+        if len(self.precision_matrices) == self.current_task:
+            self.precision_matrices.append(torch.zeros_like(embeds))
+
+        self.precision_matrices[-1] += embeds.grad**2
         self.opt.step()
 
         self.buffer.add_data(examples=not_aug_inputs,

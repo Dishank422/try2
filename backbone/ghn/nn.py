@@ -149,6 +149,13 @@ class GHN(nn.Module):
         self.bias_class = nn.Sequential(nn.ReLU(),
                                         nn.Linear(max_ch, num_classes))
 
+        # for param in self.decoder.parameters():
+        #     param.requires_grad = False
+        # for param in self.decoder_1d.parameters():
+        #     param.requires_grad = False
+        # for param in self.bias_class.parameters():
+        #     param.requires_grad = False
+
         self.architecture = architecture
         self.graphs = GraphBatch([Graph(self.architecture, ve_cutoff=50 if self.ve else 1)])
         if n_tasks is not None:
@@ -297,6 +304,7 @@ class GHN(nn.Module):
         #     return nets_torch(images), embeds
         # else:
         #     return embeds
+        x.retain_grad()
         return (nets_torch(images), x) if images is not None else x
 
     def _map_net_params(self, graphs, nets_torch, sanity_check=False):
